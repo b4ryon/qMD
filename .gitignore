@@ -1,0 +1,8 @@
+.build/
+qMD.app/
+*.o
+*.swp
+.DS_Store
+report.md
+scripts/
+dist/
