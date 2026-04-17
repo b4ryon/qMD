@@ -1,16 +1,19 @@
 // qMD - Main content view
 // NavigationSplitView with sidebar file tree and markdown detail view.
+// Owns a per-window AppState so each window browses its own directory.
 // Arrow keys handled by KeyboardHandler, Cmd+F opens find bar.
 
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
-    @Environment(AppState.self) private var appState
+    @State private var appState = AppState()
     @State private var template = HTMLTemplate()
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var keyboardHandler: KeyboardHandler?
     @State private var showSearchBar = false
     @State private var searchQuery = ""
+    @State private var hostWindow: NSWindow?
     @FocusState private var searchFieldFocused: Bool
 
     var body: some View {
@@ -47,18 +50,23 @@ struct ContentView: View {
                     Text("Open a Markdown file or folder")
                         .font(.body)
                         .foregroundStyle(.tertiary)
-                    Text("Cmd+O to open a file or folder")
+                    Text("Cmd+O to open a file or folder, Cmd+N for a new window")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .environment(appState)
         .navigationTitle(appState.windowTitle)
+        .background(WindowAccessor(window: $hostWindow))
         .onAppear {
             if keyboardHandler == nil {
-                keyboardHandler = KeyboardHandler(appState: appState)
+                keyboardHandler = KeyboardHandler(appState: appState, windowProvider: { hostWindow })
             }
+        }
+        .onOpenURL { url in
+            appState.handleOpen(url: url)
         }
         .onChange(of: appState.selectedFileURL) { _, _ in
             if showSearchBar {
@@ -71,6 +79,11 @@ struct ContentView: View {
             return true
         }
         .background(FindShortcutHandler(onFind: { toggleSearch() }, onEscape: { closeSearch() }))
+        .onReceive(NotificationCenter.default.publisher(for: QMDNotifications.openURLInKeyWindow)) { note in
+            guard let window = hostWindow, window.isKeyWindow,
+                  let url = note.userInfo?[QMDNotifications.openURLPayloadKey] as? URL else { return }
+            appState.handleOpen(url: url)
+        }
     }
 
     private func toggleSearch() {
@@ -92,6 +105,28 @@ struct ContentView: View {
         guard let webView = keyboardHandler?.webView else { return }
         let js = forward ? "nextMatch()" : "prevMatch()"
         webView.evaluateJavaScript(js) { _, _ in }
+    }
+}
+
+// Captures the hosting NSWindow so per-window code (keyboard handler, notification
+// dispatch) can scope itself to this window rather than all windows in the app.
+struct WindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            window = view.window
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if window !== nsView.window {
+                window = nsView.window
+            }
+        }
     }
 }
 

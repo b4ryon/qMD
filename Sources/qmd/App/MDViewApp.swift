@@ -1,50 +1,78 @@
 // qMD - Main application entry point
-// Configures the SwiftUI app with window, menus, and file opening support.
+// Configures the SwiftUI app with multi-window support, menus, and file opening.
+// Each main window owns its own AppState so multiple directories can be browsed
+// side by side. The About panel is a dedicated Window scene, and menu-driven
+// Open/New Window commands are dispatched to the focused window via NotificationCenter.
 
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
+
+enum QMDNotifications {
+    static let openURLInKeyWindow = Notification.Name("qmd.openURLInKeyWindow")
+    static let openURLPayloadKey = "url"
+}
 
 @main
 struct MDViewApp: App {
-    @State private var appState = AppState()
-    @State private var showAbout = false
-
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
-                .environment(appState)
-                .onOpenURL { url in
-                    appState.handleOpen(url: url)
-                }
-                .sheet(isPresented: $showAbout) {
-                    AboutView()
-                }
         }
         .commands {
-            CommandGroup(replacing: .appInfo) {
-                Button("About qMD") {
-                    showAbout = true
-                }
+            AppCommands()
+        }
+
+        Window("About qMD", id: "about") {
+            AboutView()
+        }
+        .windowResizability(.contentSize)
+    }
+}
+
+struct AppCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About qMD") {
+                openWindow(id: "about")
             }
-            CommandGroup(replacing: .newItem) {
-                Button("Open...") {
-                    openFileOrFolder()
-                }
-                .keyboardShortcut("o")
+        }
+        CommandGroup(replacing: .newItem) {
+            Button("New Window") {
+                openWindow(id: "main")
             }
+            .keyboardShortcut("n", modifiers: [.command])
+
+            Button("Open...") {
+                openFileOrFolder(openWindow: openWindow)
+            }
+            .keyboardShortcut("o", modifiers: [.command])
         }
     }
 
-    private func openFileOrFolder() {
+    private func openFileOrFolder(openWindow: OpenWindowAction) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.plainText]
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
         panel.message = "Open a Markdown file or folder"
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.handleOpen(url: url)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        // If no main window exists, spawn one and hand it the URL.
+        let hasMainWindow = NSApp.windows.contains { window in
+            window.isVisible && window.identifier?.rawValue.contains("main") == true
         }
+        if !hasMainWindow {
+            openWindow(id: "main")
+        }
+        NotificationCenter.default.post(
+            name: QMDNotifications.openURLInKeyWindow,
+            object: nil,
+            userInfo: [QMDNotifications.openURLPayloadKey: url]
+        )
     }
 }
 
@@ -61,7 +89,7 @@ struct AboutView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Version 1.0.6")
+            Text("Version 1.7.0")
                 .font(.body)
                 .foregroundStyle(.secondary)
 
@@ -94,6 +122,13 @@ struct AboutView: View {
                         .fontWeight(.medium)
                     Spacer()
                     Text("Scroll content")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Cmd+N")
+                        .fontWeight(.medium)
+                    Spacer()
+                    Text("New window")
                         .foregroundStyle(.secondary)
                 }
                 HStack {

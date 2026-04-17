@@ -1,7 +1,8 @@
-// qMD - Application-level keyboard handler
-// Intercepts arrow keys globally via NSEvent monitor to ensure consistent
-// behavior regardless of which view has focus. Left/right switch files,
-// up/down scroll the markdown content via JavaScript.
+// qMD - Per-window keyboard handler
+// Intercepts arrow keys via a local NSEvent monitor. Because NSEvent monitors
+// are app-wide, each handler checks that its owning window is the key window
+// before acting, so arrow keys don't cross-fire between open windows.
+// Left/right switch files, up/down scroll the markdown content via JavaScript.
 
 import AppKit
 import WebKit
@@ -9,10 +10,12 @@ import WebKit
 class KeyboardHandler {
     private var monitor: Any?
     private weak var appState: AppState?
+    private let windowProvider: () -> NSWindow?
     weak var webView: WKWebView?
 
-    init(appState: AppState) {
+    init(appState: AppState, windowProvider: @escaping () -> NSWindow? = { nil }) {
         self.appState = appState
+        self.windowProvider = windowProvider
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             return self?.handleKeyDown(event) ?? event
         }
@@ -25,6 +28,13 @@ class KeyboardHandler {
     }
 
     private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
+        // Only respond if our owning window is the key window. Without this,
+        // every open qMD window would react to arrow keys in parallel.
+        let owner = windowProvider()
+        if owner != nil, owner !== NSApp.keyWindow {
+            return event
+        }
+
         let hasModifiers = !event.modifierFlags
             .intersection([.command, .option, .control])
             .isEmpty
