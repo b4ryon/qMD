@@ -17,12 +17,15 @@ build:
 	rm -rf $(APP_BUNDLE)
 	mkdir -p $(APP_BUNDLE)/Contents/MacOS
 	mkdir -p $(APP_BUNDLE)/Contents/Resources
-	cp $(BUILD_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/
-	cp Info.plist $(APP_BUNDLE)/Contents/
+	ditto --noextattr --norsrc $(BUILD_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	ditto --noextattr --norsrc Info.plist $(APP_BUNDLE)/Contents/Info.plist
 	@if ls $(BUILD_DIR)/*.bundle 1>/dev/null 2>&1; then \
-		cp -r $(BUILD_DIR)/*.bundle $(APP_BUNDLE)/Contents/Resources/; \
+		for b in $(BUILD_DIR)/*.bundle; do \
+			ditto --noextattr --norsrc $$b $(APP_BUNDLE)/Contents/Resources/$$(basename $$b); \
+		done; \
 	fi
-	cp Sources/qmd/Resources/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/
+	ditto --noextattr --norsrc Sources/qmd/Resources/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
+	xattr -rc $(APP_BUNDLE) 2>/dev/null || true
 
 run: build
 	open $(APP_BUNDLE)
@@ -44,14 +47,17 @@ release-build:
 		rm -rf $$APPDIR; \
 		mkdir -p $$APPDIR/Contents/MacOS; \
 		mkdir -p $$APPDIR/Contents/Resources; \
-		cp $$BDIR/$(APP_NAME) $$APPDIR/Contents/MacOS/; \
+		ditto --noextattr --norsrc $$BDIR/$(APP_NAME) $$APPDIR/Contents/MacOS/$(APP_NAME); \
 		strip -x $$APPDIR/Contents/MacOS/$(APP_NAME); \
-		cp Info.plist $$APPDIR/Contents/; \
+		ditto --noextattr --norsrc Info.plist $$APPDIR/Contents/Info.plist; \
 		if ls $$BDIR/*.bundle 1>/dev/null 2>&1; then \
-			cp -r $$BDIR/*.bundle $$APPDIR/Contents/Resources/; \
+			for b in $$BDIR/*.bundle; do \
+				ditto --noextattr --norsrc $$b $$APPDIR/Contents/Resources/$$(basename $$b); \
+			done; \
 		fi; \
-		cp Sources/qmd/Resources/AppIcon.icns $$APPDIR/Contents/Resources/; \
+		ditto --noextattr --norsrc Sources/qmd/Resources/AppIcon.icns $$APPDIR/Contents/Resources/AppIcon.icns; \
 		xattr -rc $$APPDIR 2>/dev/null || true; \
+		find $$APPDIR -name '._*' -delete 2>/dev/null || true; \
 		echo "Done: $$APPDIR"; \
 	done
 	@echo ""
@@ -63,7 +69,7 @@ release-pkg: release-build
 	@for arch in arm64 x86_64; do \
 		echo ""; \
 		echo "Creating $(DISPLAY_NAME)-$(VERSION)-macos-$$arch.pkg..."; \
-		pkgbuild \
+		COPYFILE_DISABLE=1 pkgbuild \
 			--root $(DIST_DIR)/$$arch \
 			--identifier $(PKG_ID) \
 			--version $(VERSION) \
@@ -75,26 +81,29 @@ release-pkg: release-build
 	@echo ""
 	@echo "Verifying packages..."
 	@CLEAN=true; for arch in arm64 x86_64; do \
-		COUNT=$$(pkgutil --payload-files $(DIST_DIR)/$(DISPLAY_NAME)-$(VERSION)-macos-$$arch.pkg | grep '\._' | wc -l | tr -d ' '); \
-		if [ "$$COUNT" -gt 0 ]; then \
-			echo "Warning: $(DISPLAY_NAME)-$(VERSION)-macos-$$arch.pkg contains $$COUNT AppleDouble entries"; \
-			echo "  This is caused by com.apple.provenance xattr (macOS sandbox)."; \
-			echo "  Rebuild from a normal terminal to get clean packages."; \
-			CLEAN=false; \
+		PKG=$(DIST_DIR)/$(DISPLAY_NAME)-$(VERSION)-macos-$$arch.pkg; \
+		COUNT=$$(pkgutil --payload-files $$PKG | grep '\._' | wc -l | tr -d ' '); \
+		EXPECTED=$$(find $(DIST_DIR)/$$arch/$(APP_BUNDLE) | wc -l | tr -d ' '); \
+		if [ "$$COUNT" -eq 0 ]; then \
+			echo "  $$PKG: clean"; \
+		elif [ "$$COUNT" -le "$$EXPECTED" ]; then \
+			echo "  $$PKG: $$COUNT AppleDouble entries (expected: com.apple.provenance xattr, kernel-protected on macOS Sonoma+)"; \
 		else \
-			echo "  $(DISPLAY_NAME)-$(VERSION)-macos-$$arch.pkg: clean"; \
+			echo "Warning: $$PKG contains $$COUNT AppleDouble entries (more than $$EXPECTED files in bundle — unexpected metadata)"; \
+			CLEAN=false; \
 		fi; \
-		ZCOUNT=$$(zipinfo -1 $(DIST_DIR)/$(DISPLAY_NAME)-$(VERSION)-macos-$$arch.zip | grep '/\._' | wc -l | tr -d ' '); \
+		ZIP=$(DIST_DIR)/$(DISPLAY_NAME)-$(VERSION)-macos-$$arch.zip; \
+		ZCOUNT=$$(zipinfo -1 $$ZIP | grep '/\._' | wc -l | tr -d ' '); \
 		if [ "$$ZCOUNT" -gt 0 ]; then \
-			echo "Warning: $(DISPLAY_NAME)-$(VERSION)-macos-$$arch.zip contains $$ZCOUNT AppleDouble entries"; \
+			echo "Warning: $$ZIP contains $$ZCOUNT AppleDouble entries"; \
 			CLEAN=false; \
 		else \
-			echo "  $(DISPLAY_NAME)-$(VERSION)-macos-$$arch.zip: clean"; \
+			echo "  $$ZIP: clean"; \
 		fi; \
 	done; \
 	if [ "$$CLEAN" = "false" ]; then \
 		echo ""; \
-		echo "Warning: Some packages contain AppleDouble metadata. Rebuild from a normal terminal."; \
+		echo "Warning: Some packages contain unexpected AppleDouble metadata."; \
 	fi
 	@echo ""
 	@echo "Packages:"
