@@ -12,7 +12,8 @@ let package = Package(
             path: "Sources/qmd",
             resources: [
                 .copy("Resources/web"),
-                .copy("Resources/AppIcon.icns")
+                .copy("Resources/AppIcon.icns"),
+                .copy("Resources/qmd.welcome.png")
             ]
         ),
         .testTarget(

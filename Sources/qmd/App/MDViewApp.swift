@@ -81,15 +81,14 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 64))
-                .foregroundStyle(.blue)
+            WelcomeImageView(maxWidth: 280, cornerRadius: 10)
+                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
 
             Text("qMD")
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Version 1.7.1")
+            Text("Version 1.7.2")
                 .font(.body)
                 .foregroundStyle(.secondary)
 

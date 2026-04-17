@@ -43,16 +43,36 @@ struct ContentView: View {
                     )
                 }
             } else {
-                VStack(spacing: 12) {
-                    Text("No file selected")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                    Text("Open a Markdown file or folder")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                    Text("Cmd+O to open a file or folder, Cmd+N for a new window")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                VStack(spacing: 20) {
+                    WelcomeImageView(maxWidth: 360, cornerRadius: 14)
+                        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+
+                    VStack(spacing: 6) {
+                        Text("A simple, fast Markdown viewer for macOS")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                        Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                            .font(.body)
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    HStack(spacing: 12) {
+                        Button("Open File or Folder...") {
+                            openFromWelcome()
+                        }
+                        .keyboardShortcut("o", modifiers: [.command])
+                        .controlSize(.large)
+                    }
+                    .padding(.top, 4)
+
+                    VStack(spacing: 4) {
+                        Text("Or drag and drop a file or folder onto this window")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        Text("Cmd+N for a new window")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -99,6 +119,17 @@ struct ContentView: View {
         showSearchBar = false
         searchQuery = ""
         searchFieldFocused = false
+    }
+
+    private func openFromWelcome() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Open a Markdown file or folder"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        appState.handleOpen(url: url)
     }
 
     private func navigateSearch(forward: Bool) {
