@@ -9,7 +9,7 @@ struct WelcomeImageView: View {
     var cornerRadius: CGFloat = 12
 
     var body: some View {
-        if let url = Bundle.module.url(forResource: "qmd.welcome", withExtension: "png"),
+        if let url = ResourceLoader.url(forResource: "qmd.welcome", ext: "png"),
            let nsImage = NSImage(contentsOf: url) {
             Image(nsImage: nsImage)
                 .resizable()

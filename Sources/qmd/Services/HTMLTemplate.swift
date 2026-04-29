@@ -139,11 +139,14 @@ struct HTMLTemplate {
     }
 
     private static func loadResource(_ name: String, ext: String) -> String {
-        if let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "web") {
-            return (try? String(contentsOf: url)) ?? ""
+        if let str = ResourceLoader.string(forResource: name, ext: ext, subdirectory: "web") {
+            return str
         }
-        if let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Resources/web") {
-            return (try? String(contentsOf: url)) ?? ""
+        if let str = ResourceLoader.string(forResource: name, ext: ext, subdirectory: "Resources/web") {
+            return str
+        }
+        if let str = ResourceLoader.string(forResource: name, ext: ext) {
+            return str
         }
         return "/* Resource not found: \(name).\(ext) */"
     }
