@@ -50,7 +50,8 @@ struct HTMLTemplate {
                 return new TextDecoder('utf-8').decode(bytes);
             }
 
-            function renderMarkdown(base64) {
+            function renderMarkdown(base64, preserveScroll) {
+                var savedScroll = preserveScroll ? window.scrollY : 0;
                 var text = decodeBase64UTF8(base64);
                 var rendered = md.render(text);
                 rendered = rendered.replace(/<li><p>\\[x\\]/gi,
@@ -64,7 +65,7 @@ struct HTMLTemplate {
                 var el = document.getElementById('content');
                 el.textContent = '';
                 el.insertAdjacentHTML('afterbegin', rendered);
-                window.scrollTo(0, 0);
+                window.scrollTo(0, savedScroll);
             }
 
             var currentMatchIndex = -1;

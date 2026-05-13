@@ -28,6 +28,7 @@ class FindableWebContainer: NSView {
 struct MarkdownWebView: NSViewRepresentable {
     let markdown: String
     let baseURL: URL?
+    let fileURL: URL?
     let templateHTML: String
     let keyboardHandler: KeyboardHandler?
     let searchQuery: String
@@ -66,12 +67,15 @@ struct MarkdownWebView: NSViewRepresentable {
             context.coordinator.currentBaseURL = baseURL
             context.coordinator.pendingMarkdown = markdown
             context.coordinator.lastSearchQuery = ""
+            context.coordinator.lastFileURL = fileURL
             webView.loadHTMLString(templateHTML, baseURL: baseURL)
             return
         }
 
         if context.coordinator.isLoaded {
-            context.coordinator.renderInWebView(webView, markdown: markdown)
+            let preserveScroll = fileURL != nil && fileURL == context.coordinator.lastFileURL
+            context.coordinator.renderInWebView(webView, markdown: markdown, preserveScroll: preserveScroll)
+            context.coordinator.lastFileURL = fileURL
             context.coordinator.updateSearch(in: webView, query: searchQuery)
         } else {
             context.coordinator.pendingMarkdown = markdown
@@ -82,6 +86,7 @@ struct MarkdownWebView: NSViewRepresentable {
         var isLoaded = false
         var pendingMarkdown: String?
         var currentBaseURL: URL?
+        var lastFileURL: URL?
         weak var webView: WKWebView?
         var lastSearchQuery = ""
         private var lastRenderedHash: Int = 0
@@ -89,18 +94,19 @@ struct MarkdownWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoaded = true
             if let md = pendingMarkdown {
-                renderInWebView(webView, markdown: md)
+                renderInWebView(webView, markdown: md, preserveScroll: false)
                 pendingMarkdown = nil
             }
         }
 
-        func renderInWebView(_ webView: WKWebView, markdown: String) {
+        func renderInWebView(_ webView: WKWebView, markdown: String, preserveScroll: Bool = false) {
             let hash = markdown.hashValue
             guard hash != lastRenderedHash else { return }
             lastRenderedHash = hash
 
             let base64 = Data(markdown.utf8).base64EncodedString()
-            webView.evaluateJavaScript("renderMarkdown('\(base64)')") { _, error in
+            let preserve = preserveScroll ? "true" : "false"
+            webView.evaluateJavaScript("renderMarkdown('\(base64)', \(preserve))") { _, error in
                 if let error = error {
                     print("JS render error: \(error.localizedDescription)")
                 }

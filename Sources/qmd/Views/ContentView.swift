@@ -37,6 +37,7 @@ struct ContentView: View {
                     MarkdownWebView(
                         markdown: appState.markdownContent,
                         baseURL: appState.currentBaseURL,
+                        fileURL: appState.selectedFileURL,
                         templateHTML: template.html,
                         keyboardHandler: keyboardHandler,
                         searchQuery: searchQuery
