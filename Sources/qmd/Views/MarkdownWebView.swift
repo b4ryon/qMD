@@ -54,6 +54,7 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.webView = webView
         keyboardHandler?.webView = webView
         context.coordinator.currentBaseURL = baseURL
+        context.coordinator.currentTemplateHash = templateHTML.hashValue
         context.coordinator.pendingMarkdown = markdown
         context.coordinator.onNavigateToFile = onNavigateToFile
         webView.pageZoom = fontScale
@@ -70,9 +71,12 @@ struct MarkdownWebView: NSViewRepresentable {
             webView.pageZoom = fontScale
         }
 
-        if context.coordinator.currentBaseURL != baseURL {
+        let templateChanged = context.coordinator.currentTemplateHash != templateHTML.hashValue
+        let baseChanged = context.coordinator.currentBaseURL != baseURL
+        if baseChanged || templateChanged {
             context.coordinator.isLoaded = false
             context.coordinator.currentBaseURL = baseURL
+            context.coordinator.currentTemplateHash = templateHTML.hashValue
             context.coordinator.pendingMarkdown = markdown
             context.coordinator.lastSearchQuery = ""
             context.coordinator.lastFileURL = fileURL
@@ -94,6 +98,7 @@ struct MarkdownWebView: NSViewRepresentable {
         var isLoaded = false
         var pendingMarkdown: String?
         var currentBaseURL: URL?
+        var currentTemplateHash: Int = 0
         var lastFileURL: URL?
         weak var webView: WKWebView?
         var lastSearchQuery = ""

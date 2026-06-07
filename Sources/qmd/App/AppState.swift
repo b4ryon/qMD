@@ -20,8 +20,25 @@ class AppState {
     var navigationHistory: [URL] = []
     var navigationIndex: Int = -1
     var fontScale: CGFloat = 1.0
+    var selectedThemeID: String {
+        didSet {
+            guard oldValue != selectedThemeID else { return }
+            UserDefaults.standard.set(selectedThemeID, forKey: Self.themeUserDefaultsKey)
+        }
+    }
     private var suppressHistoryPush = false
     private let fileWatcher = FileWatcher()
+    private static let themeUserDefaultsKey = "qmd.selectedThemeID"
+
+    init() {
+        self.selectedThemeID = UserDefaults.standard.string(forKey: Self.themeUserDefaultsKey) ?? "system"
+    }
+
+    var theme: Theme { Theme.byID(selectedThemeID) }
+
+    func applyTheme(id: String) {
+        selectedThemeID = id
+    }
 
     private static let zoomStep: CGFloat = 1.1
     private static let zoomMin: CGFloat = 0.5

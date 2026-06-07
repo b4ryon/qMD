@@ -8,22 +8,45 @@ import Foundation
 struct HTMLTemplate {
     let html: String
 
-    init() {
+    init(theme: Theme = .system) {
         let markdownItJS = Self.loadResource("markdown-it.min", ext: "js")
         let highlightJS = Self.loadResource("highlight.min", ext: "js")
         let highlightDarkCSS = Self.loadResource("github-dark.min", ext: "css")
         let highlightLightCSS = Self.loadResource("github.min", ext: "css")
         let customCSS = Self.loadResource("style", ext: "css")
 
+        // hljs syntax theme picked by appearance. For named light/dark themes
+        // we lock to one stylesheet; for system we keep the prefers-color-scheme
+        // auto-switch.
+        let hljsStyles: String
+        let colorScheme: String
+        switch theme.appearance {
+        case .system:
+            hljsStyles = """
+                <style media="(prefers-color-scheme: dark)">\(highlightDarkCSS)</style>
+                <style media="(prefers-color-scheme: light)">\(highlightLightCSS)</style>
+                """
+            colorScheme = "dark light"
+        case .dark:
+            hljsStyles = "<style>\(highlightDarkCSS)</style>"
+            colorScheme = "dark"
+        case .light:
+            hljsStyles = "<style>\(highlightLightCSS)</style>"
+            colorScheme = "light"
+        }
+
+        let themeOverride = Self.themeOverrideCSS(for: theme)
+
         html = """
         <!DOCTYPE html>
-        <html>
+        <html data-theme="\(theme.id)">
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style media="(prefers-color-scheme: dark)">\(highlightDarkCSS)</style>
-            <style media="(prefers-color-scheme: light)">\(highlightLightCSS)</style>
+            <style>:root { color-scheme: \(colorScheme); }</style>
+            \(hljsStyles)
             <style>\(customCSS)</style>
+            <style>\(themeOverride)</style>
         </head>
         <body>
             <div id="content"></div>
@@ -216,6 +239,33 @@ struct HTMLTemplate {
             </script>
         </body>
         </html>
+        """
+    }
+
+    // Emits the CSS that overrides style.css defaults for a named theme.
+    // Returns empty string for the system theme so the prefers-color-scheme
+    // rules in style.css drive the appearance.
+    private static func themeOverrideCSS(for theme: Theme) -> String {
+        guard theme.id != "system",
+              let bodyBg = theme.bodyBg, let bodyFg = theme.bodyFg,
+              let link = theme.linkColor,
+              let bqBorder = theme.blockquoteBorder, let bqFg = theme.blockquoteFg,
+              let tBorder = theme.tableBorder, let tAltBg = theme.tableAltBg,
+              let hr = theme.hrColor,
+              let codeBg = theme.codeBg, let preBg = theme.preBg, let preBorder = theme.preBorder,
+              let markBg = theme.markBg, let markFg = theme.markFg
+        else { return "" }
+        return """
+        body { background-color: \(bodyBg); color: \(bodyFg); }
+        a { color: \(link); }
+        blockquote { border-left-color: \(bqBorder); color: \(bqFg); }
+        table th, table td { border-color: \(tBorder); }
+        table tr:nth-child(2n) { background-color: \(tAltBg); }
+        hr { border-color: \(hr); }
+        code { background-color: \(codeBg); }
+        pre { background-color: \(preBg); border-color: \(preBorder); }
+        pre code { background: transparent; }
+        mark.md-highlight { background-color: \(markBg); color: \(markFg); }
         """
     }
 

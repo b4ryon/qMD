@@ -59,7 +59,7 @@ final class HTMLTemplateTests: XCTestCase {
 
     func testValidHTMLStructure() {
         let template = HTMLTemplate()
-        XCTAssertTrue(template.html.contains("<html>"))
+        XCTAssertTrue(template.html.contains("<html"))
         XCTAssertTrue(template.html.contains("</html>"))
         XCTAssertTrue(template.html.contains("<head>"))
         XCTAssertTrue(template.html.contains("</head>"))

@@ -14,6 +14,8 @@ enum QMDNotifications {
     static let zoomInKeyWindow = Notification.Name("qmd.zoomInKeyWindow")
     static let zoomOutKeyWindow = Notification.Name("qmd.zoomOutKeyWindow")
     static let zoomResetKeyWindow = Notification.Name("qmd.zoomResetKeyWindow")
+    static let themeChanged = Notification.Name("qmd.themeChanged")
+    static let themeIDKey = "themeID"
 }
 
 @main
@@ -76,6 +78,21 @@ struct AppCommands: Commands {
                 )
             }
             .keyboardShortcut("0", modifiers: [.command])
+
+            Divider()
+
+            Menu("Theme") {
+                ForEach(Theme.all) { theme in
+                    Button(theme.displayName) {
+                        UserDefaults.standard.set(theme.id, forKey: "qmd.selectedThemeID")
+                        NotificationCenter.default.post(
+                            name: QMDNotifications.themeChanged,
+                            object: nil,
+                            userInfo: [QMDNotifications.themeIDKey: theme.id]
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -108,14 +125,14 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            WelcomeImageView(maxWidth: 280, cornerRadius: 10)
-                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+            WelcomeImageView(maxWidth: 380, cornerRadius: 14)
+                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
 
             Text("qMD")
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Version 1.7.7")
+            Text("Version 2.0.0")
                 .font(.body)
                 .foregroundStyle(.secondary)
 
@@ -136,48 +153,12 @@ struct AboutView: View {
                 Text("Keyboard shortcuts:")
                     .font(.headline)
                     .padding(.bottom, 2)
-                HStack {
-                    Text("Left / Right arrow")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("Switch files")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Up / Down arrow")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("Scroll content")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Cmd+N")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("New window")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Cmd+O")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("Open file or folder")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Cmd+[ / Cmd+]")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("Back / Forward")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Cmd++ / Cmd+- / Cmd+0")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("Bigger / Smaller / Actual size")
-                        .foregroundStyle(.secondary)
-                }
+                shortcutRow("\u{2190} / \u{2192}", "Switch files")
+                shortcutRow("\u{2191} / \u{2193}", "Scroll content")
+                shortcutRow("\u{2318}N", "New window")
+                shortcutRow("\u{2318}O", "Open file or folder")
+                shortcutRow("\u{2318}[ / \u{2318}]", "Back / Forward")
+                shortcutRow("\u{2318}+ / \u{2318}\u{2212} / \u{2318}0", "Bigger / Smaller / Actual size")
             }
             .font(.callout)
             .padding(.horizontal)
@@ -199,6 +180,17 @@ struct AboutView: View {
             .keyboardShortcut(.defaultAction)
         }
         .padding(24)
-        .frame(width: 360)
+        .frame(width: 440)
+    }
+
+    private func shortcutRow(_ key: String, _ label: String) -> some View {
+        HStack {
+            Text(key)
+                .fontWeight(.medium)
+                .monospacedDigit()
+            Spacer()
+            Text(label)
+                .foregroundStyle(.secondary)
+        }
     }
 }

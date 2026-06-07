@@ -127,6 +127,20 @@ struct ContentView: View {
             guard let window = hostWindow, window.isKeyWindow else { return }
             appState.resetZoom()
         }
+        .onReceive(NotificationCenter.default.publisher(for: QMDNotifications.themeChanged)) { note in
+            guard let id = note.userInfo?[QMDNotifications.themeIDKey] as? String else { return }
+            if appState.selectedThemeID != id {
+                appState.applyTheme(id: id)
+            }
+        }
+        .onChange(of: appState.selectedThemeID) { _, newID in
+            template = HTMLTemplate(theme: Theme.byID(newID))
+        }
+        .onAppear {
+            if appState.selectedThemeID != "system" {
+                template = HTMLTemplate(theme: appState.theme)
+            }
+        }
     }
 
     private func toggleSearch() {
