@@ -74,6 +74,13 @@ class AppState {
             markdownContent = ""
             return
         }
+        // Defense-in-depth: never try to read a directory as a Markdown file.
+        // The sidebar disables selection on folder rows, but stale URLs from
+        // external opens or watcher refreshes could still point at a folder.
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+            return
+        }
         do {
             markdownContent = try String(contentsOf: url, encoding: .utf8)
         } catch {

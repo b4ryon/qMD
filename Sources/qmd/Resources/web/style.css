@@ -183,3 +183,23 @@ dd { padding: 0 16px; margin-bottom: 16px; }
     background-color: rgba(255, 150, 0, 0.8);
     outline: 2px solid rgba(255, 150, 0, 0.6);
 }
+
+/* Obsidian-style ==highlight== - yellow marker tones tuned per appearance */
+mark.md-highlight {
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+@media (prefers-color-scheme: light) {
+    mark.md-highlight {
+        background-color: rgba(255, 224, 102, 0.65);
+        color: #1f2328;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    mark.md-highlight {
+        background-color: rgba(229, 192, 0, 0.45);
+        color: #f5e9b0;
+    }
+}

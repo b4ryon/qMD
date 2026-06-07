@@ -65,7 +65,52 @@ struct HTMLTemplate {
                 var el = document.getElementById('content');
                 el.textContent = '';
                 el.insertAdjacentHTML('afterbegin', rendered);
+                applyObsidianHighlights(el);
                 window.scrollTo(0, savedScroll);
+            }
+
+            // Obsidian-style ==highlight== rendered as <mark class="md-highlight">.
+            // Runs after markdown-it so standard CommonMark/GFM remains untouched.
+            // Skips text inside <code>/<pre> so inline and fenced code are preserved.
+            function applyObsidianHighlights(root) {
+                var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                    acceptNode: function(node) {
+                        var p = node.parentNode;
+                        while (p && p !== root) {
+                            var t = p.tagName;
+                            if (t === 'CODE' || t === 'PRE') return NodeFilter.FILTER_REJECT;
+                            p = p.parentNode;
+                        }
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                });
+                var nodes = [];
+                while (walker.nextNode()) nodes.push(walker.currentNode);
+                var pattern = /==([^=\\n]+?)==/g;
+                nodes.forEach(function(node) {
+                    var text = node.textContent;
+                    if (text.indexOf('==') === -1) return;
+                    pattern.lastIndex = 0;
+                    if (!pattern.test(text)) return;
+                    pattern.lastIndex = 0;
+                    var frag = document.createDocumentFragment();
+                    var last = 0;
+                    var m;
+                    while ((m = pattern.exec(text)) !== null) {
+                        if (m.index > last) {
+                            frag.appendChild(document.createTextNode(text.substring(last, m.index)));
+                        }
+                        var mark = document.createElement('mark');
+                        mark.className = 'md-highlight';
+                        mark.textContent = m[1];
+                        frag.appendChild(mark);
+                        last = m.index + m[0].length;
+                    }
+                    if (last < text.length) {
+                        frag.appendChild(document.createTextNode(text.substring(last)));
+                    }
+                    node.parentNode.replaceChild(frag, node);
+                });
             }
 
             var currentMatchIndex = -1;

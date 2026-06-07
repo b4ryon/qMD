@@ -23,7 +23,10 @@ struct SidebarView: View {
                 List(selection: $state.selectedFileURL) {
                     OutlineGroup(appState.fileNodes, children: \.children) { node in
                         if node.isFolder {
+                            // Folders cannot be selected as documents - use the
+                            // disclosure chevron to expand and reveal children.
                             Label(node.name, systemImage: "folder")
+                                .selectionDisabled()
                         } else {
                             Label(node.name, systemImage: "doc.text")
                                 .tag(node.url)
