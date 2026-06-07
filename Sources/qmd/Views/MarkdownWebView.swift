@@ -32,6 +32,7 @@ struct MarkdownWebView: NSViewRepresentable {
     let templateHTML: String
     let keyboardHandler: KeyboardHandler?
     let searchQuery: String
+    let onNavigateToFile: ((URL) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -53,6 +54,7 @@ struct MarkdownWebView: NSViewRepresentable {
         keyboardHandler?.webView = webView
         context.coordinator.currentBaseURL = baseURL
         context.coordinator.pendingMarkdown = markdown
+        context.coordinator.onNavigateToFile = onNavigateToFile
         webView.loadHTMLString(templateHTML, baseURL: baseURL)
         return container
     }
@@ -61,6 +63,7 @@ struct MarkdownWebView: NSViewRepresentable {
         guard let webView = context.coordinator.webView else { return }
         keyboardHandler?.webView = webView
         container.webView = webView
+        context.coordinator.onNavigateToFile = onNavigateToFile
 
         if context.coordinator.currentBaseURL != baseURL {
             context.coordinator.isLoaded = false
@@ -89,7 +92,11 @@ struct MarkdownWebView: NSViewRepresentable {
         var lastFileURL: URL?
         weak var webView: WKWebView?
         var lastSearchQuery = ""
+        var onNavigateToFile: ((URL) -> Void)?
         private var lastRenderedHash: Int = 0
+        private static let markdownExtensions: Set<String> = [
+            "md", "markdown", "mdown", "mkd", "mkdn"
+        ]
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoaded = true
@@ -135,6 +142,22 @@ struct MarkdownWebView: NSViewRepresentable {
         ) {
             if navigationAction.navigationType == .linkActivated,
                let url = navigationAction.request.url {
+                // In-document anchor links - let WebKit scroll as usual.
+                if let fragment = url.fragment, !fragment.isEmpty {
+                    decisionHandler(.allow)
+                    return
+                }
+                // Local markdown file links open in-window via the callback,
+                // pushing onto the navigation history.
+                if url.isFileURL,
+                   Self.markdownExtensions.contains(url.pathExtension.lowercased()),
+                   FileManager.default.fileExists(atPath: url.path),
+                   let handler = onNavigateToFile {
+                    handler(url)
+                    decisionHandler(.cancel)
+                    return
+                }
+                // Everything else (http, non-markdown files) opens externally.
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
                 return

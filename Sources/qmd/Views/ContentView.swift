@@ -25,6 +25,12 @@ struct ContentView: View {
         } detail: {
             if appState.selectedFileURL != nil {
                 VStack(spacing: 0) {
+                    NavigationBarView(
+                        canGoBack: appState.canGoBack,
+                        canGoForward: appState.canGoForward,
+                        onBack: { appState.goBack() },
+                        onForward: { appState.goForward() }
+                    )
                     if showSearchBar {
                         SearchBarView(
                             query: $searchQuery,
@@ -40,7 +46,10 @@ struct ContentView: View {
                         fileURL: appState.selectedFileURL,
                         templateHTML: template.html,
                         keyboardHandler: keyboardHandler,
-                        searchQuery: searchQuery
+                        searchQuery: searchQuery,
+                        onNavigateToFile: { url in
+                            appState.openLinkedFile(url)
+                        }
                     )
                 }
             } else {
@@ -197,6 +206,42 @@ struct FindShortcutHandler: NSViewRepresentable {
             }
             return super.performKeyEquivalent(with: event)
         }
+    }
+}
+
+struct NavigationBarView: View {
+    let canGoBack: Bool
+    let canGoForward: Bool
+    let onBack: () -> Void
+    let onForward: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canGoBack)
+            .help("Back (Cmd+[)")
+            .keyboardShortcut("[", modifiers: [.command])
+
+            Button(action: onForward) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canGoForward)
+            .help("Forward (Cmd+])")
+            .keyboardShortcut("]", modifiers: [.command])
+
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(.bar)
     }
 }
 

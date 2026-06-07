@@ -7,11 +7,24 @@ import Observation
 @Observable
 class AppState {
     var folderURL: URL?
-    var selectedFileURL: URL?
+    var selectedFileURL: URL? {
+        didSet {
+            guard oldValue != selectedFileURL else { return }
+            recordNavigation()
+        }
+    }
     var fileNodes: [FileNode] = []
     var flatFileList: [URL] = []
     var markdownContent: String = ""
+    var navigationHistory: [URL] = []
+    var navigationIndex: Int = -1
+    private var suppressHistoryPush = false
     private let fileWatcher = FileWatcher()
+
+    var canGoBack: Bool { navigationIndex > 0 }
+    var canGoForward: Bool {
+        navigationIndex >= 0 && navigationIndex < navigationHistory.count - 1
+    }
 
     var currentBaseURL: URL? {
         folderURL ?? selectedFileURL?.deletingLastPathComponent()
@@ -37,6 +50,7 @@ class AppState {
     }
 
     func loadFolder(_ url: URL) {
+        resetNavigationHistory()
         folderURL = url
         fileNodes = FileTreeLoader.loadTree(from: url)
         flatFileList = FileTreeLoader.flattenFiles(fileNodes)
@@ -52,6 +66,7 @@ class AppState {
     }
 
     func loadSingleFile(_ url: URL) {
+        resetNavigationHistory()
         let parentDir = url.deletingLastPathComponent()
         folderURL = parentDir
         fileNodes = FileTreeLoader.loadTree(from: parentDir)
@@ -60,6 +75,57 @@ class AppState {
         loadFileContent()
         setupFileWatcher()
         setupDirectoryWatcher()
+    }
+
+    // Opens a markdown file linked from the currently rendered document.
+    // Resolves outside-folder targets too; the sidebar simply won't highlight
+    // entries that aren't part of the current tree.
+    func openLinkedFile(_ url: URL) {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir),
+              !isDir.boolValue else { return }
+        selectedFileURL = url
+        loadFileContent()
+        setupFileWatcher()
+    }
+
+    func goBack() {
+        guard canGoBack else { return }
+        navigationIndex -= 1
+        navigateToHistoryEntry()
+    }
+
+    func goForward() {
+        guard canGoForward else { return }
+        navigationIndex += 1
+        navigateToHistoryEntry()
+    }
+
+    private func navigateToHistoryEntry() {
+        let target = navigationHistory[navigationIndex]
+        suppressHistoryPush = true
+        selectedFileURL = target
+        suppressHistoryPush = false
+        loadFileContent()
+        setupFileWatcher()
+    }
+
+    private func recordNavigation() {
+        guard !suppressHistoryPush, let url = selectedFileURL else { return }
+        if navigationIndex < navigationHistory.count - 1 {
+            navigationHistory = Array(navigationHistory.prefix(navigationIndex + 1))
+        }
+        if navigationHistory.last != url {
+            navigationHistory.append(url)
+            navigationIndex = navigationHistory.count - 1
+        }
+    }
+
+    private func resetNavigationHistory() {
+        suppressHistoryPush = true
+        navigationHistory = []
+        navigationIndex = -1
+        suppressHistoryPush = false
     }
 
     func selectFile(_ url: URL) {
@@ -131,6 +197,10 @@ class AppState {
         let previousSelection = selectedFileURL
         fileNodes = FileTreeLoader.loadTree(from: folder)
         flatFileList = FileTreeLoader.flattenFiles(fileNodes)
+        // Refresh re-assigns selection on disk-change events; treat it as
+        // a stay-in-place navigation rather than a new history entry.
+        suppressHistoryPush = true
+        defer { suppressHistoryPush = false }
         if let prev = previousSelection, flatFileList.contains(prev) {
             selectedFileURL = prev
             loadFileContent()

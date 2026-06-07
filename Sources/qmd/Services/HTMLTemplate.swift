@@ -43,6 +43,86 @@ struct HTMLTemplate {
                 }
             });
 
+            // Inlined markdown-it-mark - adds Obsidian-style ==highlight==.
+            // Implemented as an inline rule so the parser handles nesting,
+            // inline code, and other inline tokens inside ==...== naturally.
+            // Source: github.com/markdown-it/markdown-it-mark (MIT). Render
+            // overridden to add the md-highlight class for our CSS styling.
+            (function(md) {
+                function tokenize(state, silent) {
+                    var i, scanned, token, len, ch,
+                        start = state.pos,
+                        marker = state.src.charCodeAt(start);
+                    if (silent) return false;
+                    if (marker !== 0x3D /* = */) return false;
+                    scanned = state.scanDelims(state.pos, true);
+                    len = scanned.length;
+                    ch = String.fromCharCode(marker);
+                    if (len < 2) return false;
+                    if (len % 2) {
+                        token = state.push('text', '', 0);
+                        token.content = ch;
+                        len--;
+                    }
+                    for (i = 0; i < len; i += 2) {
+                        token = state.push('text', '', 0);
+                        token.content = ch + ch;
+                        state.delimiters.push({
+                            marker: marker, length: 0, jump: i / 2,
+                            token: state.tokens.length - 1, end: -1,
+                            open: scanned.can_open, close: scanned.can_close
+                        });
+                    }
+                    state.pos += scanned.length;
+                    return true;
+                }
+                function postProcess(state, delimiters) {
+                    var i, j, startDelim, endDelim, token,
+                        loneMarkers = [], max = delimiters.length;
+                    for (i = 0; i < max; i++) {
+                        startDelim = delimiters[i];
+                        if (startDelim.marker !== 0x3D) continue;
+                        if (startDelim.end === -1) continue;
+                        endDelim = delimiters[startDelim.end];
+                        token = state.tokens[startDelim.token];
+                        token.type = 'mark_open'; token.tag = 'mark';
+                        token.nesting = 1; token.markup = '=='; token.content = '';
+                        token = state.tokens[endDelim.token];
+                        token.type = 'mark_close'; token.tag = 'mark';
+                        token.nesting = -1; token.markup = '=='; token.content = '';
+                        if (state.tokens[endDelim.token - 1].type === 'text' &&
+                            state.tokens[endDelim.token - 1].content === '=') {
+                            loneMarkers.push(endDelim.token - 1);
+                        }
+                    }
+                    while (loneMarkers.length) {
+                        i = loneMarkers.pop();
+                        j = i + 1;
+                        while (j < state.tokens.length && state.tokens[j].type === 'mark_close') j++;
+                        j--;
+                        if (i !== j) {
+                            token = state.tokens[j];
+                            state.tokens[j] = state.tokens[i];
+                            state.tokens[i] = token;
+                        }
+                    }
+                }
+                md.inline.ruler.before('emphasis', 'mark', tokenize);
+                md.inline.ruler2.before('emphasis', 'mark', function(state) {
+                    var curr, tokens_meta = state.tokens_meta,
+                        max = (state.tokens_meta || []).length;
+                    postProcess(state, state.delimiters);
+                    for (curr = 0; curr < max; curr++) {
+                        if (tokens_meta[curr] && tokens_meta[curr].delimiters) {
+                            postProcess(state, tokens_meta[curr].delimiters);
+                        }
+                    }
+                });
+                md.renderer.rules.mark_open = function() {
+                    return '<mark class="md-highlight">';
+                };
+            })(md);
+
             function decodeBase64UTF8(b64) {
                 var bytes = Uint8Array.from(atob(b64), function(c) {
                     return c.charCodeAt(0);
@@ -65,52 +145,7 @@ struct HTMLTemplate {
                 var el = document.getElementById('content');
                 el.textContent = '';
                 el.insertAdjacentHTML('afterbegin', rendered);
-                applyObsidianHighlights(el);
                 window.scrollTo(0, savedScroll);
-            }
-
-            // Obsidian-style ==highlight== rendered as <mark class="md-highlight">.
-            // Runs after markdown-it so standard CommonMark/GFM remains untouched.
-            // Skips text inside <code>/<pre> so inline and fenced code are preserved.
-            function applyObsidianHighlights(root) {
-                var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-                    acceptNode: function(node) {
-                        var p = node.parentNode;
-                        while (p && p !== root) {
-                            var t = p.tagName;
-                            if (t === 'CODE' || t === 'PRE') return NodeFilter.FILTER_REJECT;
-                            p = p.parentNode;
-                        }
-                        return NodeFilter.FILTER_ACCEPT;
-                    }
-                });
-                var nodes = [];
-                while (walker.nextNode()) nodes.push(walker.currentNode);
-                var pattern = /==([^=\\n]+?)==/g;
-                nodes.forEach(function(node) {
-                    var text = node.textContent;
-                    if (text.indexOf('==') === -1) return;
-                    pattern.lastIndex = 0;
-                    if (!pattern.test(text)) return;
-                    pattern.lastIndex = 0;
-                    var frag = document.createDocumentFragment();
-                    var last = 0;
-                    var m;
-                    while ((m = pattern.exec(text)) !== null) {
-                        if (m.index > last) {
-                            frag.appendChild(document.createTextNode(text.substring(last, m.index)));
-                        }
-                        var mark = document.createElement('mark');
-                        mark.className = 'md-highlight';
-                        mark.textContent = m[1];
-                        frag.appendChild(mark);
-                        last = m.index + m[0].length;
-                    }
-                    if (last < text.length) {
-                        frag.appendChild(document.createTextNode(text.substring(last)));
-                    }
-                    node.parentNode.replaceChild(frag, node);
-                });
             }
 
             var currentMatchIndex = -1;
