@@ -47,6 +47,7 @@ struct ContentView: View {
                         templateHTML: template.html,
                         keyboardHandler: keyboardHandler,
                         searchQuery: searchQuery,
+                        fontScale: appState.fontScale,
                         onNavigateToFile: { url in
                             appState.openLinkedFile(url)
                         }
@@ -113,6 +114,18 @@ struct ContentView: View {
             guard let window = hostWindow, window.isKeyWindow,
                   let url = note.userInfo?[QMDNotifications.openURLPayloadKey] as? URL else { return }
             appState.handleOpen(url: url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: QMDNotifications.zoomInKeyWindow)) { _ in
+            guard let window = hostWindow, window.isKeyWindow else { return }
+            appState.zoomIn()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: QMDNotifications.zoomOutKeyWindow)) { _ in
+            guard let window = hostWindow, window.isKeyWindow else { return }
+            appState.zoomOut()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: QMDNotifications.zoomResetKeyWindow)) { _ in
+            guard let window = hostWindow, window.isKeyWindow else { return }
+            appState.resetZoom()
         }
     }
 

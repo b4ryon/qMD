@@ -11,6 +11,9 @@ import UniformTypeIdentifiers
 enum QMDNotifications {
     static let openURLInKeyWindow = Notification.Name("qmd.openURLInKeyWindow")
     static let openURLPayloadKey = "url"
+    static let zoomInKeyWindow = Notification.Name("qmd.zoomInKeyWindow")
+    static let zoomOutKeyWindow = Notification.Name("qmd.zoomOutKeyWindow")
+    static let zoomResetKeyWindow = Notification.Name("qmd.zoomResetKeyWindow")
 }
 
 @main
@@ -50,6 +53,30 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: [.command])
         }
+        // View > zoom controls. Routed via NotificationCenter so only the
+        // focused main window (not the About window) handles the shortcut.
+        CommandMenu("View") {
+            Button("Make Text Bigger") {
+                NotificationCenter.default.post(
+                    name: QMDNotifications.zoomInKeyWindow, object: nil
+                )
+            }
+            .keyboardShortcut("+", modifiers: [.command])
+
+            Button("Make Text Smaller") {
+                NotificationCenter.default.post(
+                    name: QMDNotifications.zoomOutKeyWindow, object: nil
+                )
+            }
+            .keyboardShortcut("-", modifiers: [.command])
+
+            Button("Actual Size") {
+                NotificationCenter.default.post(
+                    name: QMDNotifications.zoomResetKeyWindow, object: nil
+                )
+            }
+            .keyboardShortcut("0", modifiers: [.command])
+        }
     }
 
     private func openFileOrFolder(openWindow: OpenWindowAction) {
@@ -88,7 +115,7 @@ struct AboutView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Version 1.7.6")
+            Text("Version 1.7.7")
                 .font(.body)
                 .foregroundStyle(.secondary)
 
@@ -135,6 +162,20 @@ struct AboutView: View {
                         .fontWeight(.medium)
                     Spacer()
                     Text("Open file or folder")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Cmd+[ / Cmd+]")
+                        .fontWeight(.medium)
+                    Spacer()
+                    Text("Back / Forward")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Cmd++ / Cmd+- / Cmd+0")
+                        .fontWeight(.medium)
+                    Spacer()
+                    Text("Bigger / Smaller / Actual size")
                         .foregroundStyle(.secondary)
                 }
             }

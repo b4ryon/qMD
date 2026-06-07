@@ -32,6 +32,7 @@ struct MarkdownWebView: NSViewRepresentable {
     let templateHTML: String
     let keyboardHandler: KeyboardHandler?
     let searchQuery: String
+    let fontScale: CGFloat
     let onNavigateToFile: ((URL) -> Void)?
 
     func makeCoordinator() -> Coordinator {
@@ -55,6 +56,7 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.currentBaseURL = baseURL
         context.coordinator.pendingMarkdown = markdown
         context.coordinator.onNavigateToFile = onNavigateToFile
+        webView.pageZoom = fontScale
         webView.loadHTMLString(templateHTML, baseURL: baseURL)
         return container
     }
@@ -64,6 +66,9 @@ struct MarkdownWebView: NSViewRepresentable {
         keyboardHandler?.webView = webView
         container.webView = webView
         context.coordinator.onNavigateToFile = onNavigateToFile
+        if webView.pageZoom != fontScale {
+            webView.pageZoom = fontScale
+        }
 
         if context.coordinator.currentBaseURL != baseURL {
             context.coordinator.isLoaded = false

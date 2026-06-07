@@ -2,6 +2,7 @@
 // Manages folder, file selection, content, and navigation.
 
 import Foundation
+import CoreGraphics
 import Observation
 
 @Observable
@@ -18,12 +19,29 @@ class AppState {
     var markdownContent: String = ""
     var navigationHistory: [URL] = []
     var navigationIndex: Int = -1
+    var fontScale: CGFloat = 1.0
     private var suppressHistoryPush = false
     private let fileWatcher = FileWatcher()
+
+    private static let zoomStep: CGFloat = 1.1
+    private static let zoomMin: CGFloat = 0.5
+    private static let zoomMax: CGFloat = 3.0
 
     var canGoBack: Bool { navigationIndex > 0 }
     var canGoForward: Bool {
         navigationIndex >= 0 && navigationIndex < navigationHistory.count - 1
+    }
+
+    func zoomIn() {
+        fontScale = min(fontScale * Self.zoomStep, Self.zoomMax)
+    }
+
+    func zoomOut() {
+        fontScale = max(fontScale / Self.zoomStep, Self.zoomMin)
+    }
+
+    func resetZoom() {
+        fontScale = 1.0
     }
 
     var currentBaseURL: URL? {
