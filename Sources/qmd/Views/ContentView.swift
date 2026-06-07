@@ -141,6 +141,15 @@ struct ContentView: View {
                 template = HTMLTemplate(theme: appState.theme)
             }
         }
+        .preferredColorScheme(colorScheme(for: appState.theme.appearance))
+    }
+
+    private func colorScheme(for appearance: ThemeAppearance) -> ColorScheme? {
+        switch appearance {
+        case .system: return nil
+        case .dark: return .dark
+        case .light: return .light
+        }
     }
 
     private func toggleSearch() {

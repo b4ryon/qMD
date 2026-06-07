@@ -8,12 +8,17 @@ qMD renders Markdown files with syntax highlighting, live reload, and a sidebar 
 
 - Folder browsing with recursive sidebar tree
 - Syntax highlighting for code blocks
-- Live reload on file save
+- Live reload on file save (scroll position is preserved across reloads)
 - In-document search (Cmd+F)
-- Dark and light mode (follows system appearance)
+- 8 built-in color themes: System (default), Midnight, Daylight, Solarized Dark, Solarized Light, Dracula, Nord, Tokyo Night. Theme applies to both the rendered Markdown and the surrounding window chrome, persists across launches, and propagates to all open windows.
+- Obsidian-style `==highlight==` syntax rendered as a yellow marker, including across inline code, bold/italic, and links
+- Multi-window support (Cmd+N), with each window remembering its own folder and zoom
+- In-window navigation history for Markdown-to-Markdown links, with back/forward arrows (Cmd+[ / Cmd+]) above the document
+- Per-window font zoom (Cmd++ / Cmd+- / Cmd+0)
 - GFM tables, task lists, and raw HTML
 - Keyboard navigation (arrow keys to switch files and scroll)
 - Drag and drop to open files or folders
+- Welcome screen with branding when no document is open
 
 ## Requirements
 
@@ -45,11 +50,16 @@ make run
 
 | Key | Action |
 |---|---|
+| Cmd+N | New window |
 | Cmd+O | Open file or folder |
 | Cmd+F | Find in document |
+| Cmd+[ / Cmd+] | Back / Forward (link history) |
+| Cmd++ / Cmd+- / Cmd+0 | Make text bigger / smaller / actual size |
 | Left/Right arrow | Switch between files |
 | Up/Down arrow | Scroll content |
 | Escape | Close search bar |
+
+Themes can be picked from the **View > Theme** submenu.
 
 ## License
 

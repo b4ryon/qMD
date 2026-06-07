@@ -80,6 +80,10 @@ struct MarkdownWebView: NSViewRepresentable {
             context.coordinator.pendingMarkdown = markdown
             context.coordinator.lastSearchQuery = ""
             context.coordinator.lastFileURL = fileURL
+            // After a reload the document is empty again; clear the
+            // render-cache hash so the pending markdown is re-rendered
+            // even though its content didn't change (e.g. theme switch).
+            context.coordinator.lastRenderedHash = 0
             webView.loadHTMLString(templateHTML, baseURL: baseURL)
             return
         }
@@ -103,7 +107,7 @@ struct MarkdownWebView: NSViewRepresentable {
         weak var webView: WKWebView?
         var lastSearchQuery = ""
         var onNavigateToFile: ((URL) -> Void)?
-        private var lastRenderedHash: Int = 0
+        var lastRenderedHash: Int = 0
         private static let markdownExtensions: Set<String> = [
             "md", "markdown", "mdown", "mkd", "mkdn"
         ]
