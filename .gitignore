@@ -4,5 +4,6 @@ qMD.app/
 *.swp
 .DS_Store
 report.md
-scripts/
+scripts/*
+!scripts/smoke-test.sh
 dist/

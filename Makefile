@@ -10,7 +10,7 @@ DIST_DIR = dist
 
 VERSION ?= $(shell /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
 
-.PHONY: build run clean release release-build release-pkg release-publish
+.PHONY: build run clean smoke release release-build release-pkg release-publish
 
 build:
 	swift build -c release
@@ -29,6 +29,9 @@ build:
 
 run: build
 	open $(APP_BUNDLE)
+
+smoke: build
+	./scripts/smoke-test.sh $(APP_BUNDLE)
 
 clean:
 	swift package clean
@@ -58,6 +61,14 @@ release-build:
 		ditto --noextattr --norsrc Sources/qmd/Resources/AppIcon.icns $$APPDIR/Contents/Resources/AppIcon.icns; \
 		xattr -rc $$APPDIR 2>/dev/null || true; \
 		find $$APPDIR -name '._*' -delete 2>/dev/null || true; \
+		if strings $$APPDIR/Contents/MacOS/$(APP_NAME) | grep -q 'could not load resource bundle'; then \
+			echo "Error: $$arch binary contains SwiftPM's Bundle.module trap (crashes packaged installs, see v1.7.2)"; \
+			exit 1; \
+		fi; \
+		if strings $$APPDIR/Contents/MacOS/$(APP_NAME) | grep -q "$$(pwd)/.build"; then \
+			echo "Error: $$arch binary embeds an absolute .build path from this machine"; \
+			exit 1; \
+		fi; \
 		echo "Done: $$APPDIR"; \
 	done
 	@echo ""
@@ -65,12 +76,19 @@ release-build:
 
 release-pkg: release-build
 	@echo ""
+	@echo "Smoke-testing native-arch app before packaging..."
+	./scripts/smoke-test.sh $(DIST_DIR)/$$(uname -m)/$(APP_BUNDLE)
+	@echo ""
 	@echo "Packaging qMD $(VERSION)..."
 	@for arch in arm64 x86_64; do \
 		echo ""; \
 		echo "Creating $(DISPLAY_NAME)-$(VERSION)-macos-$$arch.pkg..."; \
+		CPLIST=$(DIST_DIR)/$$arch-components.plist; \
+		pkgbuild --analyze --root $(DIST_DIR)/$$arch $$CPLIST; \
+		/usr/libexec/PlistBuddy -c "Set :0:BundleIsRelocatable false" $$CPLIST; \
 		COPYFILE_DISABLE=1 pkgbuild \
 			--root $(DIST_DIR)/$$arch \
+			--component-plist $$CPLIST \
 			--identifier $(PKG_ID) \
 			--version $(VERSION) \
 			--install-location /Applications \

@@ -1,36 +1,63 @@
 // qMD - Resource lookup helper
 // Resolves bundled resources without going through SwiftPM's `Bundle.module`
-// accessor. The SPM-generated accessor calls `fatalError` if its candidate
-// directories don't yield a loadable NSBundle, which has been observed to
-// crash the app at launch on some user machines. This helper checks the
-// app's main bundle and the SPM resource subdirectory directly, returning
-// nil on miss instead of trapping.
+// accessor. The SPM-generated accessor for executable targets only checks
+// `Bundle.main.bundleURL/qmd_qmd.bundle` (which never matches the .app
+// layout, where the bundle lives in Contents/Resources) and a hardcoded
+// absolute path into the build machine's .build directory, then calls
+// `fatalError` on miss. That trap crashed packaged installs at launch
+// (v1.7.2 and earlier). This helper probes a set of candidate directories
+// with plain filesystem checks and returns nil on miss instead of trapping.
 
 import Foundation
 
-enum ResourceLoader {
-    static func url(forResource name: String, ext: String, subdirectory: String? = nil) -> URL? {
-        let main = Bundle.main
+// Anchor for Bundle(for:). In the packaged app this resolves to the .app
+// bundle; under `swift test` it resolves to the .xctest bundle that links
+// the qmd module, whose parent directory holds qmd_qmd.bundle.
+private final class ResourceBundleFinder {}
 
-        if let direct = main.url(forResource: name, withExtension: ext, subdirectory: subdirectory) {
+enum ResourceLoader {
+    // SwiftPM resource bundle name for the qmd target.
+    private static let resourceBundleName = "qmd_qmd.bundle"
+
+    // Directories that may contain qmd_qmd.bundle or a bare resource file.
+    private static var searchRoots: [URL] {
+        var roots: [URL] = []
+        if let url = Bundle.main.resourceURL {
+            roots.append(url)
+        }
+        let hostBundle = Bundle(for: ResourceBundleFinder.self)
+        if let url = hostBundle.resourceURL {
+            roots.append(url)
+        }
+        // Siblings of the hosting bundles: under `swift test` the resource
+        // bundle sits next to the .xctest bundle in the build directory.
+        roots.append(hostBundle.bundleURL.deletingLastPathComponent())
+        roots.append(Bundle.main.bundleURL.deletingLastPathComponent())
+        return roots
+    }
+
+    static func url(forResource name: String, ext: String, subdirectory: String? = nil) -> URL? {
+        if let direct = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: subdirectory) {
             return direct
         }
 
-        guard let resourceRoot = main.resourceURL else { return nil }
+        let fileManager = FileManager.default
+        let filename = "\(name).\(ext)"
 
-        let bundleRoot = resourceRoot.appendingPathComponent("qmd_qmd.bundle")
-        var candidate = bundleRoot
-        if let sub = subdirectory, !sub.isEmpty {
-            candidate.appendPathComponent(sub)
-        }
-        candidate.appendPathComponent("\(name).\(ext)")
-        if FileManager.default.fileExists(atPath: candidate.path) {
-            return candidate
-        }
+        for root in searchRoots {
+            var candidate = root.appendingPathComponent(resourceBundleName)
+            if let sub = subdirectory, !sub.isEmpty {
+                candidate.appendPathComponent(sub)
+            }
+            candidate.appendPathComponent(filename)
+            if fileManager.fileExists(atPath: candidate.path) {
+                return candidate
+            }
 
-        let flat = resourceRoot.appendingPathComponent("\(name).\(ext)")
-        if FileManager.default.fileExists(atPath: flat.path) {
-            return flat
+            let flat = root.appendingPathComponent(filename)
+            if fileManager.fileExists(atPath: flat.path) {
+                return flat
+            }
         }
 
         return nil
